@@ -73,3 +73,72 @@ def create_scan_effect():
     scan_plane.hide_render = True
     
     return scan_plane
+
+
+def create_printing_particles(garden_path):
+    """Create particle effects for the 3D printing process"""
+    # Create a particle system that follows the printed path
+    bpy.ops.mesh.primitive_plane_add(size=0.1, location=(0, 0, 0))
+    particle_emitter = bpy.context.object
+    particle_emitter.name = "PrintingParticles"
+    
+    # Add particle system
+    bpy.ops.object.particle_system_add()
+    particles = particle_emitter.particle_systems[0]
+    settings = particles.settings
+    
+    # Configure particles for dust/debris
+    settings.type = 'EMITTER'
+    settings.count = 1000
+    settings.lifetime = 20
+    settings.emit_from = 'VERT'
+    settings.physics_type = 'NEWTON'
+    settings.size_random = 0.5
+    settings.drag_factor = 0.5
+    
+    # Parent to garden path
+    particle_emitter.parent = garden_path
+    
+    return particle_emitter
+
+def create_heat_distortion(garden_path):
+    """Create heat distortion effect for freshly printed material"""
+    # Create a plane that follows the garden path
+    bpy.ops.mesh.primitive_plane_add(size=0.2, location=(0, 0, 0.05))
+    heat_plane = bpy.context.object
+    heat_plane.name = "HeatDistortion"
+    
+    # Create distortion material
+    distortion_mat = bpy.data.materials.new(name="HeatDistortionMaterial")
+    distortion_mat.use_nodes = True
+    nodes = distortion_mat.node_tree.nodes
+    links = distortion_mat.node_tree.links
+    
+    # Clear existing nodes
+    for node in nodes:
+        nodes.remove(node)
+    
+    # Add shader nodes for heat distortion
+    output = nodes.new(type='ShaderNodeOutputMaterial')
+    shader_mix = nodes.new(type='ShaderNodeMixShader')
+    transparent = nodes.new(type='ShaderNodeBsdfTransparent')
+    refraction = nodes.new(type='ShaderNodeBsdfRefraction')
+    
+    # Add noise for distortion
+    noise = nodes.new(type='ShaderNodeTexNoise')
+    noise.inputs["Scale"].default_value = 10.0
+    noise.inputs["Detail"].default_value = 2.0
+    
+    # Connect nodes
+    links.new(noise.outputs["Fac"], shader_mix.inputs[0])
+    links.new(transparent.outputs[0], shader_mix.inputs[1])
+    links.new(refraction.outputs[0], shader_mix.inputs[2])
+    links.new(shader_mix.outputs[0], output.inputs["Surface"])
+    
+    # Assign material
+    heat_plane.data.materials.append(distortion_mat)
+    
+    # Parent to garden path
+    heat_plane.parent = garden_path
+    
+    return heat_plane
